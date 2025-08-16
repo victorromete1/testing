@@ -1,58 +1,62 @@
 import streamlit as st
-import json
 import hashlib
-import os
+import json
+from github import Github
 
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-USERS_FILE = "users.json"  # path to your JSON file
+GITHUB_TOKEN = "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"  # store token in Streamlit Secrets
+REPO_NAME = "victorromete1/testing"           # replace with your GitHub repo
+USERS_FILE = "users.json"
+
+g = Github(GITHUB_TOKEN)
+repo = g.get_repo(REPO_NAME)
 
 # -----------------------------
 # HELPER FUNCTIONS
 # -----------------------------
 def load_users():
-    """Load user data from JSON"""
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
-    return {}
+    """Load users.json from GitHub"""
+    try:
+        contents = repo.get_contents(USERS_FILE)
+        return json.loads(contents.decoded_content.decode())
+    except Exception:
+        return {}
 
 def save_users(users):
-    """Save user data to JSON"""
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f, indent=2)
+    """Save users.json to GitHub"""
+    contents = repo.get_contents(USERS_FILE)
+    repo.update_file(
+        USERS_FILE,
+        "Update users.json",
+        json.dumps(users, indent=2),
+        contents.sha
+    )
 
 def hash_password(password):
-    """Return a hashed version of the password"""
     return hashlib.sha256(password.encode()).hexdigest()
 
 def authenticate(username, password):
-    """Check if username and password match"""
     users = load_users()
-    if username in users and users[username]["password"] == hash_password(password):
-        return True
-    return False
+    return username in users and users[username]["password"] == hash_password(password)
 
 def register_user(username, password):
-    """Add a new user"""
     users = load_users()
     if username in users:
-        return False  # user already exists
+        return False
     users[username] = {"password": hash_password(password)}
     save_users(users)
     return True
 
 # -----------------------------
-# STREAMLIT APP
+# STREAMLIT UI
 # -----------------------------
-st.title("🔐 Simple User Login System")
+st.title("🔐 Persistent Login System")
 
-# Choose login or signup
 mode = st.radio("Choose an action:", ["Login", "Sign Up"])
 
 if mode == "Sign Up":
-    st.subheader("Create a new account")
     new_user = st.text_input("Username")
     new_password = st.text_input("Password", type="password")
     confirm_password = st.text_input("Confirm Password", type="password")
@@ -69,7 +73,6 @@ if mode == "Sign Up":
                 st.error("Username already exists.")
 
 elif mode == "Login":
-    st.subheader("Login to your account")
     username = st.text_input("Username", key="login_user")
     password = st.text_input("Password", type="password", key="login_pass")
     
@@ -81,7 +84,6 @@ elif mode == "Login":
         else:
             st.error("❌ Invalid username or password")
 
-# Optional: show logout button if logged in
 if st.session_state.get("logged_in"):
     if st.button("Logout"):
         st.session_state["logged_in"] = False
