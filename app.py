@@ -6,7 +6,7 @@ from github import Github
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-GITHUB_TOKEN = "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"  # store token in Streamlit Secrets
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # store token in Streamlit Secrets
 REPO_NAME = "victorromete1/testing"           # replace with your GitHub repo
 USERS_FILE = "users.json"
 
