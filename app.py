@@ -1,58 +1,42 @@
 import streamlit as st
 import hashlib
-import json
-from github import Github
+from supabase import create_client, Client
 
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]  # store token in Streamlit Secrets
-REPO_NAME = "victorromete1/testing"           # replace with your GitHub repo
-USERS_FILE = "users.json"
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
-g = Github(GITHUB_TOKEN)
-repo = g.get_repo(REPO_NAME)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -----------------------------
 # HELPER FUNCTIONS
 # -----------------------------
-def load_users():
-    """Load users.json from GitHub"""
-    try:
-        contents = repo.get_contents(USERS_FILE)
-        return json.loads(contents.decoded_content.decode())
-    except Exception:
-        return {}
-
-def save_users(users):
-    """Save users.json to GitHub"""
-    contents = repo.get_contents(USERS_FILE)
-    repo.update_file(
-        USERS_FILE,
-        "Update users.json",
-        json.dumps(users, indent=2),
-        contents.sha
-    )
-
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def authenticate(username, password):
-    users = load_users()
-    return username in users and users[username]["password"] == hash_password(password)
+    """Check if username + password match"""
+    hashed = hash_password(password)
+    response = supabase.table("users").select("*").eq("username", username).execute()
+    if response.data:
+        return response.data[0]["password"] == hashed
+    return False
 
 def register_user(username, password):
-    users = load_users()
-    if username in users:
+    """Register a new user"""
+    # check if user exists
+    response = supabase.table("users").select("*").eq("username", username).execute()
+    if response.data:
         return False
-    users[username] = {"password": hash_password(password)}
-    save_users(users)
+    supabase.table("users").insert({"username": username, "password": hash_password(password)}).execute()
     return True
 
 # -----------------------------
 # STREAMLIT UI
 # -----------------------------
-st.title("🔐 Persistent Login System")
+st.title("🔐 Supabase Login System")
 
 mode = st.radio("Choose an action:", ["Login", "Sign Up"])
 
