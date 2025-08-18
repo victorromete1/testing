@@ -17,7 +17,6 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 def register_user(username: str, password: str) -> bool:
-    """Insert a new user into Supabase 'users' table"""
     try:
         hashed = hash_password(password)
         supabase.table("users").insert({"username": username, "password": hashed}).execute()
@@ -27,7 +26,6 @@ def register_user(username: str, password: str) -> bool:
         return False
 
 def authenticate(username: str, password: str) -> bool:
-    """Check username + password"""
     try:
         hashed = hash_password(password)
         response = supabase.table("users").select("*").eq("username", username).eq("password", hashed).execute()
@@ -37,7 +35,6 @@ def authenticate(username: str, password: str) -> bool:
         return False
 
 def reset_user_password(target_username: str, new_password: str) -> bool:
-    """Admin-only: reset a user's password"""
     try:
         hashed = hash_password(new_password)
         supabase.table("users").update({"password": hashed}).eq("username", target_username).execute()
@@ -51,13 +48,17 @@ def reset_user_password(target_username: str, new_password: str) -> bool:
 # -----------------------------
 st.title("🔐 Supabase Login System")
 
+mode = st.radio("Choose an action:", ["Login", "Sign Up"])
+
+# Reuse username input for admin check
+username = st.text_input("Username", key="login_user")
+password = st.text_input("Password", type="password", key="login_pass")
+
 # -----------------------------
-# Hidden Admin Mode
+# Admin Mode Detection
 # -----------------------------
 admin_mode = False
-admin_key_input = st.text_input("Username (leave blank for admin key):", key="admin_check", type="default")
-
-if admin_key_input == st.secrets["ADMIN_KEY"]:
+if username == "" and password == st.secrets["ADMIN_KEY"]:
     admin_mode = True
     st.success("🔑 Admin mode activated!")
 
@@ -77,10 +78,8 @@ else:
     # -----------------------------
     # Regular Mode
     # -----------------------------
-    mode = st.radio("Choose an action:", ["Login", "Sign Up"])
-
     if mode == "Sign Up":
-        new_user = st.text_input("Username", key="signup_user")
+        new_user = st.text_input("New Username", key="signup_user")
         new_password = st.text_input("Password", type="password", key="signup_pass")
         confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm")
 
@@ -94,9 +93,6 @@ else:
                     st.success("✅ Account created! You can now login.")
 
     elif mode == "Login":
-        username = st.text_input("Username", key="login_user")
-        password = st.text_input("Password", type="password", key="login_pass")
-
         if st.button("Login"):
             if authenticate(username, password):
                 st.success(f"✅ Welcome, {username}!")
