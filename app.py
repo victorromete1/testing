@@ -7,6 +7,7 @@ from supabase import create_client
 # -----------------------------
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+ADMIN_KEY = st.secrets["ADMIN_KEY"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -17,8 +18,13 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 def register_user(username: str, password: str) -> bool:
+    """Insert a new user into Supabase 'users' table"""
     try:
         hashed = hash_password(password)
+        # Check if user already exists
+        existing = supabase.table("users").select("*").eq("username", username).execute()
+        if existing.data:
+            return False
         supabase.table("users").insert({"username": username, "password": hashed}).execute()
         return True
     except Exception as e:
@@ -26,6 +32,7 @@ def register_user(username: str, password: str) -> bool:
         return False
 
 def authenticate(username: str, password: str) -> bool:
+    """Check username + password"""
     try:
         hashed = hash_password(password)
         response = supabase.table("users").select("*").eq("username", username).eq("password", hashed).execute()
@@ -34,61 +41,98 @@ def authenticate(username: str, password: str) -> bool:
         st.error(f"Error: {e}")
         return False
 
-def reset_user_password(target_username: str, new_password: str) -> bool:
+def delete_account(username: str):
+    """Delete the logged-in user's account"""
+    try:
+        supabase.table("users").delete().eq("username", username).execute()
+        st.session_state["logged_in"] = False
+        st.session_state["username"] = ""
+        st.success("✅ Account deleted!")
+    except Exception as e:
+        st.error(f"Error: {e}")
+
+def admin_reset_password(target_username: str, new_password: str):
+    """Reset any user's password (Admin only)"""
     try:
         hashed = hash_password(new_password)
         supabase.table("users").update({"password": hashed}).eq("username", target_username).execute()
-        return True
+        st.success(f"✅ Password for '{target_username}' has been reset!")
     except Exception as e:
         st.error(f"Error: {e}")
-        return False
 
 # -----------------------------
 # STREAMLIT UI
 # -----------------------------
 st.title("🔐 Supabase Login System")
 
-username = st.text_input("Username", key="main_user")
-
 mode = st.radio("Choose an action:", ["Login", "Sign Up"])
 
-# Admin check
-if username == "" and "ADMIN_KEY" in st.secrets:
-    admin_pass = st.text_input("Enter admin key", type="password")
-    if st.button("Admin Login"):
-        if admin_pass == st.secrets["ADMIN_KEY"]:
-            st.session_state["admin"] = True
-            st.success("✅ Admin access granted!")
-        else:
-            st.error("❌ Invalid admin key")
+# -----------------------------
+# SIGN UP
+# -----------------------------
+if mode == "Sign Up":
+    new_user = st.text_input("New Username", key="sign_user")
+    new_password = st.text_input("New Password", type="password", key="sign_pass")
+    confirm_password = st.text_input("Confirm Password", type="password", key="sign_confirm")
 
-if st.session_state.get("admin"):
-    st.header("Admin Controls")
-    target_user = st.text_input("Username to reset password")
-    new_pass = st.text_input("New password", type="password")
-    if st.button("Reset Password"):
-        hashed = hashlib.sha256(new_pass.encode()).hexdigest()
-        supabase.table("users").update({"password": hashed}).eq("username", target_user).execute()
-        st.success(f"Password for {target_user} reset!")
-
-if mode == "Sign Up" and not st.session_state.get("admin"):
-    new_password = st.text_input("Password", type="password", key="signup_pass")
-    confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm")
     if st.button("Sign Up"):
-        if not username or not new_password:
+        if not new_user or not new_password:
             st.warning("Please enter both username and password.")
         elif new_password != confirm_password:
             st.error("Passwords do not match!")
         else:
-            if register_user(username, new_password):
+            if register_user(new_user, new_password):
                 st.success("✅ Account created! You can now login.")
+            else:
+                st.error("Username already exists.")
 
-elif mode == "Login" and not st.session_state.get("admin"):
+# -----------------------------
+# LOGIN
+# -----------------------------
+elif mode == "Login":
+    username = st.text_input("Username", key="login_user")
     password = st.text_input("Password", type="password", key="login_pass")
+
     if st.button("Login"):
-        if authenticate(username, password):
+        # Admin hidden mode: blank username + admin key
+        if username.strip() == "" and password == ADMIN_KEY:
+            st.session_state["admin_mode"] = True
+            st.success("✅ Admin mode activated!")
+        elif authenticate(username, password):
             st.success(f"✅ Welcome, {username}!")
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
         else:
             st.error("❌ Invalid username or password")
+
+# -----------------------------
+# LOGGED IN USER CONTROLS
+# -----------------------------
+if st.session_state.get("logged_in"):
+    st.write(f"Logged in as: **{st.session_state['username']}**")
+
+    if st.button("Logout"):
+        st.session_state["logged_in"] = False
+        st.session_state["username"] = ""
+        st.success("Logged out!")
+
+    if st.button("Delete Account"):
+        delete_account(st.session_state["username"])
+
+# -----------------------------
+# ADMIN MODE CONTROLS
+# -----------------------------
+if st.session_state.get("admin_mode"):
+    st.subheader("🛠 Admin Controls (Hidden Mode)")
+
+    target_user = st.text_input("Target Username to Reset Password")
+    new_pass = st.text_input("New Password", type="password")
+    if st.button("Reset User Password"):
+        if target_user and new_pass:
+            admin_reset_password(target_user, new_pass)
+        else:
+            st.warning("Enter both username and new password.")
+
+    if st.button("Exit Admin Mode"):
+        st.session_state["admin_mode"] = False
+        st.success("Exited admin mode.")
