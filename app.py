@@ -48,64 +48,47 @@ def reset_user_password(target_username: str, new_password: str) -> bool:
 # -----------------------------
 st.title("🔐 Supabase Login System")
 
+username = st.text_input("Username", key="main_user")
+
 mode = st.radio("Choose an action:", ["Login", "Sign Up"])
 
-# Reuse username input for admin check
-username = st.text_input("Username", key="login_user")
-password = st.text_input("Password", type="password", key="login_pass")
-
-# -----------------------------
-# Admin Mode Detection
-# -----------------------------
-admin_mode = False
-if username == "" and password == st.secrets["ADMIN_KEY"]:
-    admin_mode = True
-    st.success("🔑 Admin mode activated!")
-
-if admin_mode:
-    st.subheader("Admin Controls")
-    target_user = st.text_input("Target Username to reset password")
-    new_password = st.text_input("New Password", type="password")
-    if st.button("Reset User Password"):
-        if target_user and new_password:
-            if reset_user_password(target_user, new_password):
-                st.success(f"✅ Password for '{target_user}' reset successfully!")
-            else:
-                st.error("❌ Failed to reset password")
+# Admin check
+if username == "" and "ADMIN_KEY" in st.secrets:
+    admin_pass = st.text_input("Enter admin key", type="password")
+    if st.button("Admin Login"):
+        if admin_pass == st.secrets["ADMIN_KEY"]:
+            st.session_state["admin"] = True
+            st.success("✅ Admin access granted!")
         else:
-            st.warning("Please enter both target username and new password")
-else:
-    # -----------------------------
-    # Regular Mode
-    # -----------------------------
-    if mode == "Sign Up":
-        new_user = st.text_input("New Username", key="signup_user")
-        new_password = st.text_input("Password", type="password", key="signup_pass")
-        confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm")
+            st.error("❌ Invalid admin key")
 
-        if st.button("Sign Up"):
-            if not new_user or not new_password:
-                st.warning("Please enter both username and password.")
-            elif new_password != confirm_password:
-                st.error("Passwords do not match!")
-            else:
-                if register_user(new_user, new_password):
-                    st.success("✅ Account created! You can now login.")
+if st.session_state.get("admin"):
+    st.header("Admin Controls")
+    target_user = st.text_input("Username to reset password")
+    new_pass = st.text_input("New password", type="password")
+    if st.button("Reset Password"):
+        hashed = hashlib.sha256(new_pass.encode()).hexdigest()
+        supabase.table("users").update({"password": hashed}).eq("username", target_user).execute()
+        st.success(f"Password for {target_user} reset!")
 
-    elif mode == "Login":
-        if st.button("Login"):
-            if authenticate(username, password):
-                st.success(f"✅ Welcome, {username}!")
-                st.session_state["logged_in"] = True
-                st.session_state["username"] = username
-            else:
-                st.error("❌ Invalid username or password")
+if mode == "Sign Up" and not st.session_state.get("admin"):
+    new_password = st.text_input("Password", type="password", key="signup_pass")
+    confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm")
+    if st.button("Sign Up"):
+        if not username or not new_password:
+            st.warning("Please enter both username and password.")
+        elif new_password != confirm_password:
+            st.error("Passwords do not match!")
+        else:
+            if register_user(username, new_password):
+                st.success("✅ Account created! You can now login.")
 
-    # -----------------------------
-    # Logout Button
-    # -----------------------------
-    if st.session_state.get("logged_in"):
-        if st.button("Logout"):
-            st.session_state["logged_in"] = False
-            st.session_state["username"] = ""
-            st.success("Logged out!")
+elif mode == "Login" and not st.session_state.get("admin"):
+    password = st.text_input("Password", type="password", key="login_pass")
+    if st.button("Login"):
+        if authenticate(username, password):
+            st.success(f"✅ Welcome, {username}!")
+            st.session_state["logged_in"] = True
+            st.session_state["username"] = username
+        else:
+            st.error("❌ Invalid username or password")
