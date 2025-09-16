@@ -40,7 +40,7 @@ if "study_sessions" not in st.session_state:
 if "events" not in st.session_state:
     st.session_state.events = [
         {"name": "Math Exam", "date": datetime.now().date().isoformat(), "color": "#FF0000", "notes": "Chapters 1-4"},
-        {"name": "Project Due", "date": (datetime.now().date() + st.delta(days=2)).isoformat(), "color": "#0000FF", "notes": "History presentation"}
+        {"name": "Project Due", "date": "2025-09-18", "color": "#0000FF", "notes": "History presentation"}
     ]
 # ===============================================
 # End of Dummy Data
@@ -151,6 +151,8 @@ if st.session_state.page == "🏠 Home":
     with col_right:
         st.markdown("### 📅 Upcoming Events")
         st.markdown("<div style='background-color: #f9f9f9; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #FF0000'><div style='font-weight: bold;'>Math Exam</div><div style='color: #666; font-size: 0.9em;'>Today</div></div>", unsafe_allow_html=True)
+        st.markdown("<div style='background-color: #f9f9f9; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #0000FF'><div style='font-weight: bold;'>Project Due</div><div style='color: #666; font-size: 0.9em;'>In 2 days</div></div>", unsafe_allow_html=True)
+
 
         st.markdown("### 💡 Study Tip")
         st.info("💡 Try the Pomodoro technique: 25 minutes of focused study, then a 5-minute break.")
@@ -307,7 +309,7 @@ elif st.session_state.page == "📝 Autograder":
     c1.selectbox("Text type:", ["Essay", "Story", "Article", "Other"])
     c2.text_input("Extra notes (optional)", placeholder="e.g., Focus on creativity...")
     st.button("🚀 Grade Now", type="primary", use_container_width=True)
-    
+
     st.subheader(f"📊 Score: 8/10")
     st.progress(0.8)
     st.markdown("### ✅ Strengths")
