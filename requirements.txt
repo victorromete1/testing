@@ -3,3 +3,4 @@ PyGithub
 requests
 supabase
 datetime
+matplotlib
